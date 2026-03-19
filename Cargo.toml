@@ -1,13 +1,17 @@
 [workspace]
-members = ["gateway", "network", "client", "agent", "types","token-generator"]
+members = [
+    "sra-core",
+    "sra-network",
+    "sra-gateway",
+    "sra-agent",
+    "sra-client",
+    "sra-token",
+]
 resolver = "2"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"
 
-[patch.crates-io]
-narrowlink-types = { path = "types" }
-narrowlink-network = { path = "network" }
 
 [profile.release]
 opt-level = "z"          # Optimize for size.

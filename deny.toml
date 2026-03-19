@@ -12,7 +12,7 @@ unknown-registry = "deny"
 unknown-git = "deny"
 
 [sources.allow-org]
-github = ["narrowlink"]
+github = ["narrowlink", "flaviuvlaicu"]
 
 [licenses]
 # allow-osi-fsf-free = "both"
@@ -30,7 +30,7 @@ allow = [
 ]
 
 exceptions = [
-    { allow = ["AGPL-3.0"], crate = "narrowlink-gateway" },
+    { allow = ["AGPL-3.0"], crate = "sra-gateway" },
     { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" }
 ]
 

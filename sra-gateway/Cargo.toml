@@ -1,0 +1,69 @@
+[package]
+name = "sra-gateway"
+version = "0.2.6"
+edition = "2021"
+description = "SRA Gateway"
+readme = "README.md"
+homepage = "https://narrowlink.com"
+repository = "https://github.com/narrowlink/narrowlink/"
+license = "AGPL-3.0"
+keywords = ["sra"]
+authors = ['Narrowlink <opensource@narrowlink.com>']
+
+include = [
+    "Cargo.toml",
+    "LICENSE",
+    "sample_gateway.yaml",
+    "src/**/*",
+    "*help.arg",
+    "templates/*.html",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio = { version = "1.43.1", features = ["full"] }
+hyper = { version = "0.14.31", features = ["full"] }
+tracing = { version = "0.1.41", default-features = false, features = [
+    "attributes",
+] }
+tracing-subscriber = { version = "0.3.20", default-features = false, features = [
+    "fmt",
+    "ansi",
+    "json",
+] }
+tracing-appender = { version = "0.2.3", default-features = false }
+dirs = { version = "5.0.1", default-features = false }
+serde_json = { version = "1.0.133", default-features = false }
+serde_yaml = { version = "0.9.34", default-features = false }
+serde = { version = "1.0.215", features = ["derive"], default-features = false }
+async-trait = { version = "0.1.83", default-features = false }
+futures-util = { version = "0.3.31", default-features = false }
+askama = { version = "0.12.1", default-features = false }
+pem = { version = "3.0.4", default-features = false, features = ["std"] }
+uuid = { version = "1.11.0", default-features = false, features = [
+    "v4",
+    "serde",
+] }
+either = { version = "1.13.0", default-features = false }
+instant-acme = { version = "0.4.3", default-features = false, features = [
+    "hyper-rustls",
+] }
+tokio-rustls = { version = "0.24.1", default-features = false }
+rustls = { version = "0.21.12", default-features = false }
+rustls-pemfile = { version = "1.0.4", default-features = false }
+validator = { version = "0.19", default-features = false, features = [
+    "derive",
+] }
+rcgen = { version = "0.11.3", default-features = false, features = [
+    "pem",
+    "x509-parser",
+] }
+x509-parser = { version = "0.15.1", default-features = false }
+clap_lex = { version = "0.7.3", default-features = false }
+sha3 = { version = "0.10.8", default-features = false }
+thiserror = { version = "1.0.69", default-features = false }
+
+sra-core = { path = "../sra-core" }
+sra-network = { path = "../sra-network" }
