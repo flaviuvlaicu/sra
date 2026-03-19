@@ -1,7 +1,7 @@
-Narrowlink Gateway
+SRA Gateway
 
 Usage:
-  narrowlink [options]
+  sra [options]
 
 Options:
   -c, --config=    Specify a config file

@@ -3,11 +3,11 @@ name = "sra-network"
 version = "0.2.6"
 edition = "2021"
 description = "SRA Network Library"
-homepage = "https://narrowlink.com"
-repository = "https://github.com/narrowlink/narrowlink/"
+homepage = "https://github.com/flaviuvlaicu/sra"
+repository = "https://github.com/flaviuvlaicu/sra"
 license = 'MPL-2.0'
 keywords = ["sra"]
-authors = ['Narrowlink <opensource@narrowlink.com>']
+authors = ["Flaviu Vlaicu"]
 
 include = ["Cargo.toml", "LICENSE", "src/**/*"]
 

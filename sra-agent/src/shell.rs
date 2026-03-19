@@ -9,6 +9,7 @@ pub const SHELL_PORT: u16 = 22222;
 
 const MSG_DATA: u8 = 0x00;
 const MSG_RESIZE: u8 = 0x01;
+const MAX_FRAME_SIZE: u16 = 8192;
 
 enum PtyMsg {
     Input(Vec<u8>),
@@ -61,10 +62,9 @@ async fn handle_session(mut stream: TcpStream) -> anyhow::Result<()> {
     let mut cmd = CommandBuilder::new(&shell);
     cmd.env("TERM", "xterm-256color");
 
-    let _child = pair.slave.spawn_command(cmd)?;
+    let mut child = pair.slave.spawn_command(cmd)?;
     drop(pair.slave);
 
-    // Use channels to avoid Arc/Clone issues with PtyMaster
     let (pty_tx, mut pty_rx) = mpsc::channel::<PtyMsg>(64);
     let pty_tx_close = pty_tx.clone();
 
@@ -74,14 +74,15 @@ async fn handle_session(mut stream: TcpStream) -> anyhow::Result<()> {
 
     let (mut tcp_read, mut tcp_write) = stream.into_split();
 
-    // Blocking thread: owns master for resize, handles input writes
-    // Separate sub-thread for PTY reads
-    let pty_thread = std::thread::spawn(move || {
-        let rt = tokio::runtime::Handle::current();
+    // Capture the tokio runtime handle BEFORE spawning OS threads,
+    // since std::thread::spawn does not inherit the async runtime context.
+    let rt_handle = tokio::runtime::Handle::current();
+    let rt_handle2 = rt_handle.clone();
 
+    // Blocking thread: owns master for resize, handles input writes
+    let pty_thread = std::thread::spawn(move || {
         // Sub-thread: reads PTY output and sends to TCP
         let reader_thread = std::thread::spawn(move || {
-            let rt2 = tokio::runtime::Handle::current();
             let mut buf = [0u8; 4096];
             loop {
                 match master_reader.read(&mut buf) {
@@ -92,15 +93,15 @@ async fn handle_session(mut stream: TcpStream) -> anyhow::Result<()> {
                         frame.push(MSG_DATA);
                         frame.extend_from_slice(&len.to_be_bytes());
                         frame.extend_from_slice(&buf[..n]);
-                        if rt2.block_on(tcp_write.write_all(&frame)).is_err() { break; }
-                        let _ = rt2.block_on(tcp_write.flush());
+                        if rt_handle2.block_on(tcp_write.write_all(&frame)).is_err() { break; }
+                        let _ = rt_handle2.block_on(tcp_write.flush());
                     }
                 }
             }
         });
 
         // Process input and resize messages from async side
-        while let Some(msg) = rt.block_on(pty_rx.recv()) {
+        while let Some(msg) = rt_handle.block_on(pty_rx.recv()) {
             match msg {
                 PtyMsg::Input(data) => {
                     if master_writer.write_all(&data).is_err() { break; }
@@ -124,7 +125,8 @@ async fn handle_session(mut stream: TcpStream) -> anyhow::Result<()> {
             match msg_type[0] {
                 MSG_DATA => {
                     let len = match tcp_read.read_u16().await {
-                        Ok(n) => n as usize, Err(_) => break,
+                        Ok(n) if n <= MAX_FRAME_SIZE => n as usize,
+                        _ => break,
                     };
                     let mut data = vec![0u8; len];
                     if tcp_read.read_exact(&mut data).await.is_err() { break; }
@@ -144,6 +146,9 @@ async fn handle_session(mut stream: TcpStream) -> anyhow::Result<()> {
     tcp_to_pty.await?;
     let _ = pty_tx_close.send(PtyMsg::Close).await;
     let _ = tokio::task::spawn_blocking(move || pty_thread.join()).await;
+
+    // Reap the child process to prevent zombies
+    let _ = child.wait();
 
     info!("Shell session ended");
     Ok(())

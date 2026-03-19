@@ -1,7 +1,7 @@
-Narrowlink
+SRA
 
 Usage:
-  narrowlink [OPTIONS] <COMMAND>
+  sra [OPTIONS] <COMMAND>
 
 Available Commands:
   list          List agents

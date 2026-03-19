@@ -167,7 +167,7 @@ impl State {
 
                                         let mut params = CertificateParams::new(vec![agent_ip.to_string()]);
                                         params.distinguished_name = DistinguishedName::new();
-                                        params.distinguished_name.push(rcgen::DnType::OrganizationName, "Narrowlink");
+                                        params.distinguished_name.push(rcgen::DnType::OrganizationName, "SRA");
                                         let Ok((cert,key)) = rcgen::Certificate::from_params(params).and_then(|cert|cert.serialize_der().map(|c|(c,cert.serialize_private_key_der()))) else {
                                             let _ = client.send(ClientEventInBound::Response(request_id,ClientEventResponse::Failed)).await;
                                             continue

@@ -4,8 +4,8 @@ Description:
   Prints out information about the agents
 
 Examples:
-  narrowlink list
-  narrowlink l -v
+  sra list
+  sra l -v
 
 Options:
   -v, --verbose

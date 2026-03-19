@@ -1,14 +1,14 @@
 Connect to a remote addr
 
 Usage:
-  narrowlink connect [OPTIONS] <remote_addr:remote_port>
+  sra connect [OPTIONS] <remote_addr:remote_port>
 
 Description:
   Connect to a remote addr in the agent side
 
 Examples:
-  narrowlink connect -n <agent name> <remote_addr:remote_port>
-  narrowlink c -un <agent name> <remote_addr:remote_port>
+  sra connect -n <agent name> <remote_addr:remote_port>
+  sra c -un <agent name> <remote_addr:remote_port>
 
 Options:
   -d, --direct      Direct connection to the remote endpoint (peer-to-peer)

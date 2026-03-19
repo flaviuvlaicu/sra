@@ -30,11 +30,13 @@ pub fn run_shell(agent: &str, passphrase: Option<&str>) -> anyhow::Result<()> {
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())  // logs go to stderr, not stdout
+        .stderr(Stdio::inherit())
         .spawn()?;
 
-    let mut stdin = child.stdin.take().expect("stdin");
-    let mut stdout_pipe = child.stdout.take().expect("stdout");
+    let mut stdin = child.stdin.take()
+        .ok_or_else(|| anyhow::anyhow!("failed to open stdin pipe to sra connect"))?;
+    let stdout_pipe = child.stdout.take()
+        .ok_or_else(|| anyhow::anyhow!("failed to open stdout pipe from sra connect"))?;
 
     // Send initial terminal size: cols (u16 BE) then rows (u16 BE)
     let (cols, rows) = terminal_size()?;
@@ -47,20 +49,55 @@ pub fn run_shell(agent: &str, passphrase: Option<&str>) -> anyhow::Result<()> {
 
     enable_raw_mode()?;
 
+    // Run session in a closure so raw mode is always restored
+    let result = run_session(&mut stdin, stdout_pipe);
+
+    disable_raw_mode()?;
+    eprintln!();
+
+    // Gracefully close stdin first so the subprocess can detect EOF and exit
+    drop(stdin);
+    // Give it a moment to exit, then force kill if needed
+    match child.try_wait() {
+        Ok(Some(_)) => {}
+        _ => {
+            let _ = child.kill();
+        }
+    }
+    let _ = child.wait();
+    eprintln!("\x1b[32m[sra] session ended\x1b[0m");
+
+    result
+}
+
+fn run_session(
+    stdin: &mut dyn Write,
+    mut stdout_pipe: std::process::ChildStdout,
+) -> anyhow::Result<()> {
     // Thread: agent PTY output → local stdout
+    // stdout_pipe ownership moves into this thread
     let output_thread = std::thread::spawn(move || {
         let mut header = [0u8; 1];
         let mut out = std::io::stdout();
         loop {
-            if stdout_pipe.read_exact(&mut header).is_err() { break; }
+            match stdout_pipe.read_exact(&mut header) {
+                Ok(()) => {}
+                Err(_) => break,
+            }
             if header[0] == MSG_DATA {
                 let mut len_buf = [0u8; 2];
                 if stdout_pipe.read_exact(&mut len_buf).is_err() { break; }
                 let len = u16::from_be_bytes(len_buf) as usize;
+                if len > 65535 { break; } // sanity check
                 let mut data = vec![0u8; len];
                 if stdout_pipe.read_exact(&mut data).is_err() { break; }
                 if out.write_all(&data).is_err() { break; }
                 let _ = out.flush();
+            } else {
+                // Unknown frame type from agent — skip.
+                // Currently only MSG_DATA is sent agent→client,
+                // so any other byte means protocol corruption; bail out.
+                break;
             }
         }
     });
@@ -83,15 +120,15 @@ pub fn run_shell(agent: &str, passphrase: Option<&str>) -> anyhow::Result<()> {
                     frame.push(MSG_DATA);
                     frame.extend_from_slice(&len.to_be_bytes());
                     frame.extend_from_slice(&bytes);
-                    stdin.write_all(&frame)?;
-                    stdin.flush()?;
+                    if stdin.write_all(&frame).is_err() { break; }
+                    if stdin.flush().is_err() { break; }
                 }
                 Event::Resize(cols, rows) => {
                     let mut frame = vec![MSG_RESIZE];
                     frame.extend_from_slice(&cols.to_be_bytes());
                     frame.extend_from_slice(&rows.to_be_bytes());
-                    stdin.write_all(&frame)?;
-                    stdin.flush()?;
+                    if stdin.write_all(&frame).is_err() { break; }
+                    if stdin.flush().is_err() { break; }
                 }
                 _ => {}
             }
@@ -99,17 +136,13 @@ pub fn run_shell(agent: &str, passphrase: Option<&str>) -> anyhow::Result<()> {
         if output_thread.is_finished() { break; }
     }
 
-    disable_raw_mode()?;
-    println!();
-    let _ = child.kill();
-    let _ = child.wait();
-    eprintln!("\x1b[32m[sra] session ended\x1b[0m");
     Ok(())
 }
 
 fn key_to_bytes(code: KeyCode, modifiers: KeyModifiers) -> Vec<u8> {
     let ctrl = modifiers.contains(KeyModifiers::CONTROL);
-    match code {
+    let alt = modifiers.contains(KeyModifiers::ALT);
+    let base = match code {
         KeyCode::Char(c) => {
             if ctrl {
                 let b = c as u8;
@@ -121,7 +154,13 @@ fn key_to_bytes(code: KeyCode, modifiers: KeyModifiers) -> Vec<u8> {
         KeyCode::Enter     => vec![b'\r'],
         KeyCode::Backspace => vec![0x7f],
         KeyCode::Delete    => vec![0x1b, b'[', b'3', b'~'],
-        KeyCode::Tab       => vec![b'\t'],
+        KeyCode::Tab       => {
+            if modifiers.contains(KeyModifiers::SHIFT) {
+                vec![0x1b, b'[', b'Z'] // Shift+Tab (backtab)
+            } else {
+                vec![b'\t']
+            }
+        }
         KeyCode::Esc       => vec![0x1b],
         KeyCode::Up        => vec![0x1b, b'[', b'A'],
         KeyCode::Down      => vec![0x1b, b'[', b'B'],
@@ -131,10 +170,27 @@ fn key_to_bytes(code: KeyCode, modifiers: KeyModifiers) -> Vec<u8> {
         KeyCode::End       => vec![0x1b, b'[', b'F'],
         KeyCode::PageUp    => vec![0x1b, b'[', b'5', b'~'],
         KeyCode::PageDown  => vec![0x1b, b'[', b'6', b'~'],
+        KeyCode::Insert    => vec![0x1b, b'[', b'2', b'~'],
         KeyCode::F(1)      => vec![0x1b, b'O', b'P'],
         KeyCode::F(2)      => vec![0x1b, b'O', b'Q'],
         KeyCode::F(3)      => vec![0x1b, b'O', b'R'],
         KeyCode::F(4)      => vec![0x1b, b'O', b'S'],
+        KeyCode::F(5)      => vec![0x1b, b'[', b'1', b'5', b'~'],
+        KeyCode::F(6)      => vec![0x1b, b'[', b'1', b'7', b'~'],
+        KeyCode::F(7)      => vec![0x1b, b'[', b'1', b'8', b'~'],
+        KeyCode::F(8)      => vec![0x1b, b'[', b'1', b'9', b'~'],
+        KeyCode::F(9)      => vec![0x1b, b'[', b'2', b'0', b'~'],
+        KeyCode::F(10)     => vec![0x1b, b'[', b'2', b'1', b'~'],
+        KeyCode::F(11)     => vec![0x1b, b'[', b'2', b'3', b'~'],
+        KeyCode::F(12)     => vec![0x1b, b'[', b'2', b'4', b'~'],
         _                  => vec![],
+    };
+    // Wrap with ESC prefix for Alt+key
+    if alt && !base.is_empty() {
+        let mut out = vec![0x1b];
+        out.extend(base);
+        out
+    } else {
+        base
     }
 }

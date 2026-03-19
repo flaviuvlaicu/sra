@@ -1,7 +1,7 @@
 Create a SOCKS5 proxy
 
 Usage:
-  narrowlink proxy [OPTIONS] <local_addr:local_port>
+  sra proxy [OPTIONS] <local_addr:local_port>
   
 
 Description:
@@ -9,8 +9,8 @@ Description:
   The default listen address is 127.0.0.1:1080
 
 Examples:
-  narrowlink proxy -n <agent name> -m <addr>=<addr> <local_addr:local_port>
-  narrowlink p -n <agent name>
+  sra proxy -n <agent name> -m <addr>=<addr> <local_addr:local_port>
+  sra p -n <agent name>
 
 Options:
   -d, --direct      Direct connection to the remote endpoint (peer-to-peer)

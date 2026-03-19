@@ -1,7 +1,7 @@
-Narrowlink Token Generator
+SRA Token
 
 Usage:
-  narrowlink [options]
+  sra [options]
 
 Options:
   -c, --config=    Specify a config file

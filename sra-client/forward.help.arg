@@ -1,14 +1,14 @@
 Create a forward tunnel
 
 Usage:
-  narrowlink forward [OPTIONS] <remote_addr:remote_port>
+  sra forward [OPTIONS] <remote_addr:remote_port>
 
 Description:
   Creates a tunnel between agent and client
 
 Examples:
-  narrowlink forward -n <agent name> <remote_addr:remote_port>
-  narrowlink f -un <agent name> <remote_addr:remote_port>
+  sra forward -n <agent name> <remote_addr:remote_port>
+  sra f -un <agent name> <remote_addr:remote_port>
 
 Options:
   -d, --direct      Direct connection to the remote endpoint (peer-to-peer)
